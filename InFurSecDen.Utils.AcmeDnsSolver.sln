@@ -3,6 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InFurSecDen.Utils.AcmeDnsSolver", "src\InFurSecDen.Utils.AcmeDnsSolver\InFurSecDen.Utils.AcmeDnsSolver.csproj", "{255FB7AA-F902-47C7-859A-4A4FDF3BBBC7}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{271876D5-D12B-4A01-8D21-C51FB4D72369}"
+	ProjectSection(SolutionItems) = preProject
+		LICENSE = LICENSE
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

@@ -7,6 +7,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="1.0.22" />
     <PackageReference Include="Certes" Version="2.3.3" />
+    <PackageReference Include="Microsoft.Rest.ClientRuntime.Azure.Authentication" Version="2.3.7" />
+    <PackageReference Include="Microsoft.Azure.Management.ResourceManager.Fluent" Version="1.19.0" />
+    <PackageReference Include="Microsoft.Azure.Management.Dns" Version="3.0.1" />
+    <PackageReference Include="Microsoft.Azure.KeyVault" Version="3.0.3" />
+    <PackageReference Include="Microsoft.Azure.KeyVault.Extensions" Version="3.0.3" />
+    <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.0.3" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">

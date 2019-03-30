@@ -165,7 +165,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             }
 
             // Get the Certificate
-            var privateKey = KeyFactory.NewKey(KeyAlgorithm.ES256);
+            var privateKey = KeyFactory.NewKey(KeyAlgorithm.RS256);
             var cert = await order.Generate(new CsrInfo
             {
                 CountryName = CountryName,

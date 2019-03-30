@@ -189,7 +189,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             // EXPORT CERTIFICATE TO AZURE KEY VAULT CERTIFICATES
             try
             {
-                await keyVaultClient.ImportCertificateAsync(keyVaultLocation, GetDashedReversedDnsName(zoneName), pfxX509Collection, certPolicy);
+                await keyVaultClient.ImportCertificateAsync(keyVaultLocation, GetDashedReversedDnsName(zoneName), pfxX509Collection, null);
             }
             catch (Exception ex)
             {

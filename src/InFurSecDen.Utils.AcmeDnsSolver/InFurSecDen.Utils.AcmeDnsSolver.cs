@@ -29,7 +29,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
 #if DEBUG
             , RunOnStartup=true
 #endif
-            )] TimerInfo myTimer, 
+            )] TimerInfo myTimer,
             ILogger log,
             ExecutionContext context
         )

@@ -10,6 +10,7 @@
     "Acme:Certificate:Locality": "Example City",
     "Acme:Certificate:State": "Example State",
     "Acme:Certificate:CountryIso3166": "XX",
+    "Acme:Server": "LetsEncrypt-Staging",
     "Azure:ServiceTokenProviderConnectionString": "RunAs=Developer;DeveloperTool=AzureCli",
     "Azure:Dns:SubscriptionId": "aaaabbbb-cccc-dddd-eeee-ffffgggghhhh",
     "Azure:Dns:ResourceGroupName": "resource-group",

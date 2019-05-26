@@ -58,6 +58,22 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
                 SubscriptionId = config["Azure:Dns:SubscriptionId"],
             };
 
+            // Select the ACME server URI
+            Uri acmeServer;
+            switch (config["Acme:Server"].ToLowerInvariant())
+            {
+                case "letsencrypt":
+                case "letsencrypt-production":
+                    acmeServer = WellKnownServers.LetsEncryptV2;
+                    break;
+                case "letsencrypt-staging":
+                    acmeServer = WellKnownServers.LetsEncryptStagingV2;
+                    break;
+                default:
+                    acmeServer = new Uri(config["Acme:Server"]);
+                    break;
+            }
+
             // TODO: Check if the account already exists for this email address/ACME Server
             string pemKey = null;
             var keyVaultLocation = $"https://{config["Azure:KeyVault:VaultName"]}.vault.azure.net/";
@@ -77,12 +93,12 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
                 throw;
             }
 
+            // Get the ACME account and load the ACME client
             IAcmeContext acme;
-
             if (pemKey == null)
             {
                 // Creating new ACME account
-                acme = new AcmeContext(WellKnownServers.LetsEncryptStagingV2);
+                acme = new AcmeContext(acmeServer);
                 var account = await acme.NewAccount(config["Acme:Account:EmailAddress"], true);
 
                 // TODO: Save the account key for later use
@@ -93,7 +109,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             {
                 // Load the saved account key
                 var accountKey = KeyFactory.FromPem(pemKey);
-                acme = new AcmeContext(WellKnownServers.LetsEncryptStagingV2, accountKey);
+                acme = new AcmeContext(acmeServer, accountKey);
                 var account = await acme.Account();
             }
 

@@ -23,30 +23,6 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
     {
         private const string ACME_DNS_CHALLENGE_SUBDOMAIN = "_acme-challenge";
 
-        // TODO: Move these to config (note: pemKey needs runtime saving too)
-
-        // Azure - AD
-        private const string subscriptionId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
-
-        // Azure - Key Vault
-        private const string resourceGroupName = "resourceGroup";
-        private const string keyVaultResourceName = "keyVault";
-        //Need Key Vault resource name
-
-        // Azure - DNS
-        private const string zoneName = "login.furry.nz"; // Rename to "DNS Resource Name"
-
-        // Certificate
-        // TODO: common name
-        private const string OrganizationUnit = "Development Team";
-        private const string Organization = "Org";
-        private const string Locality = "Loc";
-        private const string State = "City";
-        private const string CountryName = "XX";
-
-        // ACME
-        private const string emailAddress = "email@domain.tld";
-
         [FunctionName("AcmeDnsSolver")]
         public static async Task Run(
             [TimerTrigger("29 4 1 */2 *"
@@ -63,12 +39,11 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             // Build Configuration from App Settings
             var config = new ConfigurationBuilder()
                 .SetBasePath(context.FunctionAppDirectory)
-                .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
                 .AddEnvironmentVariables()
                 .Build();
 
             // Get the Azure Authorisation Context
-            var azureServiceTokenProvider = new AzureServiceTokenProvider("RunAs=Developer;DeveloperTool=AzureCli"); // https://docs.microsoft.com/en-us/azure/key-vault/service-to-service-authentication#connection-string-support
+            var azureServiceTokenProvider = new AzureServiceTokenProvider(config["Azure:ServiceTokenProviderConnectionString"]); // https://docs.microsoft.com/en-us/azure/key-vault/service-to-service-authentication#connection-string-support
 
             // Get the Key Vault Client
             var keyVaultClient = new KeyVaultClient(
@@ -80,13 +55,13 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             var azureManagementAccessTokenCredentals = new TokenCredentials(azureManagementAccessToken);
             var dnsClient = new DnsManagementClient(azureManagementAccessTokenCredentals)
             {
-                SubscriptionId = subscriptionId
+                SubscriptionId = config["Azure:Dns:SubscriptionId"],
             };
 
             // TODO: Check if the account already exists for this email address/ACME Server
             string pemKey = null;
-            var keyVaultLocation = $"https://{keyVaultResourceName}.vault.azure.net/";
-            var keyVaultAcmeAccountSecretName = $"Acme--AccountKey--{GetBase16HashString(emailAddress)}";
+            var keyVaultLocation = $"https://{config["Azure:KeyVault:VaultName"]}.vault.azure.net/";
+            var keyVaultAcmeAccountSecretName = $"Acme--AccountKey--{config["Acme:Account:EmailAddress"]}";
             try
             {
                 var secretVersions = await keyVaultClient.GetSecretVersionsAsync(keyVaultLocation, keyVaultAcmeAccountSecretName);
@@ -108,7 +83,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             {
                 // Creating new ACME account
                 acme = new AcmeContext(WellKnownServers.LetsEncryptStagingV2);
-                var account = await acme.NewAccount(emailAddress, true);
+                var account = await acme.NewAccount(config["Acme:Account:EmailAddress"], true);
 
                 // TODO: Save the account key for later use
                 await keyVaultClient.SetSecretAsync(keyVaultLocation, keyVaultAcmeAccountSecretName, acme.AccountKey.ToPem(), contentType: "application/x-pem-file");
@@ -123,7 +98,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             }
 
             // Place a certificate order
-            var order = await acme.NewOrder(new[] { zoneName });
+            var order = await acme.NewOrder(new[] { config["Acme:Certificate:CommonName"] });
 
             // Generate the value for DNS TXT record
             var authz = (await order.Authorizations()).First();
@@ -139,9 +114,9 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
                     new TxtRecord(new List<string>{dnsTxt}),
                 },
             };
-            var recordSet = await dnsClient.RecordSets.CreateOrUpdateAsync(resourceGroupName, zoneName, ACME_DNS_CHALLENGE_SUBDOMAIN, RecordType.TXT, recordSetParams);
+            var recordSet = await dnsClient.RecordSets.CreateOrUpdateAsync(config["Azure:Dns:ResourceGroupName"], config["Azure:Dns:ZoneResourceName"], ACME_DNS_CHALLENGE_SUBDOMAIN, RecordType.TXT, recordSetParams);
 
-            // TODO: Check CAA record
+            // TODO: Check/Set CAA record
 
             // Validate the DNS challenge
             var result = await dnsChallenge.Validate(); // TODO: Retry if not ready yet (with timeout)
@@ -168,28 +143,28 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             var privateKey = KeyFactory.NewKey(KeyAlgorithm.RS256);
             var cert = await order.Generate(new CsrInfo
             {
-                CountryName = CountryName,
-                State = State,
-                Locality = Locality,
-                Organization = Organization,
-                OrganizationUnit = OrganizationUnit,
-                CommonName = zoneName,
+                CountryName = config["Acme:Certificate:CountryIso3166"],
+                State = config["Acme:Certificate:State"],
+                Locality = config["Acme:Certificate:Locality"],
+                Organization = config["Acme:Certificate:Organization"],
+                OrganizationUnit = config["Acme:Certificate:OrganizationUnit"],
+                CommonName = config["Acme:Certificate:CommonName"]
             }, privateKey);
 
             // Export full chain certification
-            var certPem = cert.ToPem();
+            var certAndKeyPem = cert.ToPem() + privateKey.ToPem();
 
             // Export PFX
             var pfxBuilder = cert.ToPfx(privateKey);
-            var pfxBytes = pfxBuilder.Build(zoneName, "abcd1234");
-            var pfxX509 = new X509Certificate2(pfxBytes, "abcd1234", X509KeyStorageFlags.Exportable); // Exportable else doesn't work on macOS
+            var pfxBytes = pfxBuilder.Build(config["Acme:Certificate:CommonName"], "");
+            var pfxX509 = new X509Certificate2(pfxBytes, "", X509KeyStorageFlags.Exportable); // Exportable else doesn't work on macOS
             var pfxX509Collection = new X509Certificate2Collection(pfxX509);
             var certPolicy = new CertificatePolicy();
 
-            // EXPORT CERTIFICATE TO AZURE KEY VAULT CERTIFICATES
+            // Export certificate to Key Vault
             try
             {
-                await keyVaultClient.ImportCertificateAsync(keyVaultLocation, GetDashedReversedDnsName(zoneName), pfxX509Collection, null);
+                await keyVaultClient.ImportCertificateAsync(keyVaultLocation, GetDashedReversedDnsName(config["Acme:Certificate:CommonName"]), pfxX509Collection, null);
             }
             catch (Exception ex)
             {
@@ -197,17 +172,16 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
                 throw;
             }
 
-            // CLEAN UP AZURE DNS
-
-            // NOTIFY SERVERS TO CLEAN THEIR CONFIG (or just reboot them, whatever)
+            // Remove now useless DNS record(s) from Key Vault
+            await dnsClient.RecordSets.DeleteAsync(config["Azure:Dns:ResourceGroupName"], config["Azure:Dns:ZoneResourceName"], ACME_DNS_CHALLENGE_SUBDOMAIN, RecordType.TXT);
         }
 
         private static string GetBase16HashString(string text)
         {
-            if (text == null) throw new ArgumentNullException(nameof(emailAddress));
+            if (text == null) throw new ArgumentNullException(nameof(text));
 
             var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(emailAddress));
+            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(text));
             return BitConverter.ToString(hash).Replace("-", string.Empty);
         }
 

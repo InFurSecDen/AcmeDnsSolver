@@ -1,0 +1,19 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "Acme:Account:EmailAddress": "acmeaccount@example.com",
+    "Acme:Certificate:CommonName": "subdomain.example.com",
+    "Acme:Certificate:OrganizationUnit": "Example Organization Unit",
+    "Acme:Certificate:Organization": "Example Organization",
+    "Acme:Certificate:Locality": "Example City",
+    "Acme:Certificate:State": "Example State",
+    "Acme:Certificate:CountryIso3166": "XX",
+    "Azure:ServiceTokenProviderConnectionString": "RunAs=Developer;DeveloperTool=AzureCli",
+    "Azure:Dns:SubscriptionId": "aaaabbbb-cccc-dddd-eeee-ffffgggghhhh",
+    "Azure:Dns:ResourceGroupName": "resource-group",
+    "Azure:Dns:ZoneResourceName": "dnsresource",
+    "Azure:KeyVault:VaultName": "example-vault"
+  }
+}

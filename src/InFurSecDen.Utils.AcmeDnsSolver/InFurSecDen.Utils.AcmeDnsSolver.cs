@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -61,7 +61,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             // TODO: Check if the account already exists for this email address/ACME Server
             string pemKey = null;
             var keyVaultLocation = $"https://{config["Azure:KeyVault:VaultName"]}.vault.azure.net/";
-            var keyVaultAcmeAccountSecretName = $"Acme--AccountKey--{config["Acme:Account:EmailAddress"]}";
+            var keyVaultAcmeAccountSecretName = $"Acme--AccountKey--{GetBase16HashString(config["Acme:Account:EmailAddress"])}";
             try
             {
                 var secretVersions = await keyVaultClient.GetSecretVersionsAsync(keyVaultLocation, keyVaultAcmeAccountSecretName);

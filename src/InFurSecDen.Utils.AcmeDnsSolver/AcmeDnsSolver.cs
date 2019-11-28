@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Certes;
 using Certes.Acme;
@@ -30,12 +31,11 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             , RunOnStartup=true
 #endif
             )] TimerInfo myTimer,
+            CancellationToken cancellationToken,
             ILogger log,
-            ExecutionContext context
+            Microsoft.Azure.WebJobs.ExecutionContext context
         )
         {
-            // TODO: Get CancellationToken
-
             // Build Configuration from App Settings
             var config = new ConfigurationBuilder()
                 .SetBasePath(context.FunctionAppDirectory)
@@ -51,7 +51,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             );
 
             // Get the DNS Client - https://stackoverflow.com/questions/53192345
-            var azureManagementAccessToken = await azureServiceTokenProvider.GetAccessTokenAsync("https://management.azure.com");
+            var azureManagementAccessToken = await azureServiceTokenProvider.GetAccessTokenAsync("https://management.azure.com", cancellationToken: cancellationToken);
             var azureManagementAccessTokenCredentals = new TokenCredentials(azureManagementAccessToken);
             var dnsClient = new DnsManagementClient(azureManagementAccessTokenCredentals)
             {
@@ -80,10 +80,10 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             var keyVaultAcmeAccountSecretName = $"Acme--AccountKey--{GetBase16HashString(acmeServer + "|" + config["Acme:Account:EmailAddress"])}";
             try
             {
-                var secretVersions = await keyVaultClient.GetSecretVersionsAsync(keyVaultLocation, keyVaultAcmeAccountSecretName);
+                var secretVersions = await keyVaultClient.GetSecretVersionsAsync(keyVaultLocation, keyVaultAcmeAccountSecretName, cancellationToken: cancellationToken);
                 if (secretVersions.Any())
                 {
-                    var pemKeyBundle = await keyVaultClient.GetSecretAsync(keyVaultLocation, keyVaultAcmeAccountSecretName);
+                    var pemKeyBundle = await keyVaultClient.GetSecretAsync(keyVaultLocation, keyVaultAcmeAccountSecretName, cancellationToken: cancellationToken);
                     pemKey = pemKeyBundle?.Value;
                 }
             }
@@ -102,7 +102,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
                 var account = await acme.NewAccount(config["Acme:Account:EmailAddress"], true);
 
                 // TODO: Save the account key for later use
-                await keyVaultClient.SetSecretAsync(keyVaultLocation, keyVaultAcmeAccountSecretName, acme.AccountKey.ToPem(), contentType: "application/x-pem-file");
+                await keyVaultClient.SetSecretAsync(keyVaultLocation, keyVaultAcmeAccountSecretName, acme.AccountKey.ToPem(), contentType: "application/x-pem-file", cancellationToken: cancellationToken);
                 pemKey = acme.AccountKey.ToPem();
             }
             else
@@ -130,7 +130,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
                     new TxtRecord(new List<string>{dnsTxt}),
                 },
             };
-            var recordSet = await dnsClient.RecordSets.CreateOrUpdateAsync(config["Azure:Dns:ResourceGroupName"], config["Azure:Dns:ZoneResourceName"], ACME_DNS_CHALLENGE_SUBDOMAIN, RecordType.TXT, recordSetParams);
+            var recordSet = await dnsClient.RecordSets.CreateOrUpdateAsync(config["Azure:Dns:ResourceGroupName"], config["Azure:Dns:ZoneResourceName"], ACME_DNS_CHALLENGE_SUBDOMAIN, RecordType.TXT, recordSetParams, cancellationToken: cancellationToken);
 
             // TODO: Check/Set CAA record
 
@@ -180,7 +180,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             // Export certificate to Key Vault
             try
             {
-                await keyVaultClient.ImportCertificateAsync(keyVaultLocation, GetDashedReversedDnsName(config["Acme:Certificate:CommonName"]), pfxX509Collection, null);
+                await keyVaultClient.ImportCertificateAsync(keyVaultLocation, GetDashedReversedDnsName(config["Acme:Certificate:CommonName"]), pfxX509Collection, null, cancellationToken: cancellationToken);
             }
             catch (Exception ex)
             {
@@ -189,7 +189,7 @@ namespace InFurSecDen.Utils.AcmeDnsSolver
             }
 
             // Remove now useless DNS record(s) from Key Vault
-            await dnsClient.RecordSets.DeleteAsync(config["Azure:Dns:ResourceGroupName"], config["Azure:Dns:ZoneResourceName"], ACME_DNS_CHALLENGE_SUBDOMAIN, RecordType.TXT);
+            await dnsClient.RecordSets.DeleteAsync(config["Azure:Dns:ResourceGroupName"], config["Azure:Dns:ZoneResourceName"], ACME_DNS_CHALLENGE_SUBDOMAIN, RecordType.TXT, cancellationToken: cancellationToken);
         }
 
         private static string GetBase16HashString(string text)
